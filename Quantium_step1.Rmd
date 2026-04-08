@@ -1,0 +1,127 @@
+---
+title: "Quantium Step 1"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This document serves as the initial step in the Quantium data analysis process. It includes loading the necessary libraries, importing the datasets, performing basic data exploration, checking for missing values, and conducting feature extraction to prepare the data for further analysis.
+
+## Front Matter
+
+```{r front-matter}
+library(dplyr)
+#install.packages("httpgd")
+library(httpgd)
+#install.packages("tidyverse")
+library(tidyverse)
+#install.packages("readxl")
+library(readxl)
+library(ggplot2)
+```
+
+## Loading the data
+
+```{r load-data}
+purchase_data <- read.csv("QVI_purchase_behaviour.csv")
+transaction_data <- read_excel("QVI_transaction_data.xlsx")
+```
+
+## Basic Data Exploration
+
+```{r}
+head(purchase_data, 5)
+head(transaction_data, 5)
+
+summary(purchase_data[, c("LIFESTAGE", "PREMIUM_CUSTOMER")])
+summary(transaction_data)
+```
+
+## Checking for missing values
+
+```{r null-check}
+colSums(is.na(purchase_data))
+colSums(is.na(transaction_data))
+```
+
+No missing values found in either dataset.
+
+## Feature Work and Exploration 
+
+```{r date-conversion}
+# Converting DATE from Excel numeric format to Date format in R
+transaction_data$DATE <- as.Date(transaction_data$DATE, origin = "1899-12-30")
+#head(transaction_data$DATE, 5)
+```
+
+```{r pack-size}
+# Extracting PACK_SIZE from PROD_NAME - ignoring case sensitivity and handling both 999g and 999G formats as grams
+transaction_data$PACK_SIZE <- as.numeric(gsub(".*?(\\d+)g.*", "\\1", transaction_data$PROD_NAME, ignore.case = TRUE))
+sum(is.na(transaction_data$PACK_SIZE))
+transaction_data[is.na(transaction_data$PACK_SIZE), "PROD_NAME"] %>% unique()
+#View(transaction_data)
+```
+
+```{r brand-name}
+# Extracting BRAND from PROD_NAME - taking the first word as the brand name
+transaction_data$BRAND <- gsub(" .*", "", transaction_data$PROD_NAME)
+head(transaction_data$BRAND, 5)
+```
+
+```{r merge-data}
+merged_data <- merge(transaction_data, purchase_data, by = "LYLTY_CARD_NBR")
+```
+
+```{r family-status}
+# Create family status variable
+merged_data$FAMILY_STATUS <- ifelse(grepl("FAMILIES", merged_data$LIFESTAGE), 
+                                     "FAMILIES", 
+                                     "SINGLES/COUPLES")
+head(merged_data, 5)
+```
+
+```{r explore-merged}
+# Set factor order on merged_data
+merged_data$LIFESTAGE <- factor(merged_data$LIFESTAGE, levels = c(
+  "NEW FAMILIES",
+  "YOUNG SINGLES/COUPLES",
+  "YOUNG FAMILIES",
+  "MIDAGE SINGLES/COUPLES",
+  "OLDER FAMILIES",
+  "OLDER SINGLES/COUPLES",
+  "RETIREES"
+))
+
+# Exploring the merged dataset by summarizing total spend, average spend, transaction count, and average pack size by LIFESTAGE and PREMIUM_CUSTOMER
+segment_summary <- merged_data %>%
+  group_by(LIFESTAGE, FAMILY_STATUS, PREMIUM_CUSTOMER) %>%
+  summarise(
+    total_spend = sum(TOT_SALES),
+    avg_spend = mean(TOT_SALES),
+    transaction_count = n(),
+    avg_pack_size = mean(PACK_SIZE)
+  )
+
+head(segment_summary$LIFESTAGE, 21)
+
+View(segment_summary)
+```
+
+## Analysis
+
+What lifestage leads to the most total spend?
+
+```{r lifestage-analysis}
+lifestage_total <- merged_data %>%
+  group_by(LIFESTAGE, FAMILY_STATUS) %>%
+  summarise(total_spend = sum(TOT_SALES))
+
+ggplot(lifestage_total, aes(x = LIFESTAGE, y = total_spend, fill = LIFESTAGE)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~ FAMILY_STATUS, scale = "free_x") +
+  labs(title = "Total Spend by Lifestage", x = "Lifestage", y = "Total Spend") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none")
+```
