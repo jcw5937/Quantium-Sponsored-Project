@@ -1,6 +1,6 @@
 ---
 title: "Quantium Step 1"
-output: github_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
@@ -20,6 +20,7 @@ library(tidyverse)
 #install.packages("readxl")
 library(readxl)
 library(ggplot2)
+library(scales)
 ```
 
 ## Loading the data
@@ -106,7 +107,13 @@ segment_summary <- merged_data %>%
 
 head(segment_summary$LIFESTAGE, 21)
 
-View(segment_summary)
+#View(segment_summary)
+```
+
+```{r lifestage-data}
+lifestage_total <- merged_data %>%
+  group_by(LIFESTAGE, FAMILY_STATUS) %>%
+  summarise(total_spend = sum(TOT_SALES))
 ```
 
 ## Analysis
@@ -114,14 +121,30 @@ View(segment_summary)
 What lifestage leads to the most total spend?
 
 ```{r lifestage-analysis}
-lifestage_total <- merged_data %>%
-  group_by(LIFESTAGE, FAMILY_STATUS) %>%
-  summarise(total_spend = sum(TOT_SALES))
-
 ggplot(lifestage_total, aes(x = LIFESTAGE, y = total_spend, fill = LIFESTAGE)) +
   geom_bar(stat = "identity") +
-  facet_wrap(~ FAMILY_STATUS, scale = "free_x") +
+  facet_wrap(~ FAMILY_STATUS, scales = "free_x") +
+  scale_fill_manual(values = c(
+    "NEW FAMILIES" = "green",
+    "YOUNG FAMILIES" = "orange",
+    "OLDER FAMILIES" = "red",
+    "YOUNG SINGLES/COUPLES" = "green",
+    "MIDAGE SINGLES/COUPLES" = "orange",
+    "OLDER SINGLES/COUPLES" = "red",
+    "RETIREES" = "black"
+  )) +
+  scale_y_continuous(labels = scales::comma, limits = c(0, 403000)) +
   labs(title = "Total Spend by Lifestage", x = "Lifestage", y = "Total Spend") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        legend.position = "none")
+  theme(
+    strip.text = element_text(size = 32, face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 11),
+    axis.text.y = element_text(size = 11),
+    axis.title = element_text(size = 13),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"
+  )
+
 ```
+
+This graph tells me that age is the biggest factor in total spend. The older the spender is, the more they are likely to spend. This is try for both singles and families, but it is more pronouced with families. Younger people are more vairable, and are likely to spend money before they start a family.
+
